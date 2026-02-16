@@ -701,21 +701,128 @@ export const getPatientMedicalHistory = async () => {
 // Book new appointment
 export const bookAppointment = async (appointmentData) => {
   try {
-    const response = await authenticatedFetch('http://localhost:8085/api/appointment/book', {
+    console.log('=== BOOKING APPOINTMENT DEBUG ===');
+    console.log('Appointment data:', appointmentData);
+    
+    const jwtToken = getJwtToken();
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (jwtToken) {
+      headers.Authorization = `Bearer ${jwtToken}`;
+    }
+    
+    const response = await fetch('http://localhost:8085/api/appointment/book', {
       method: 'POST',
+      headers: headers,
       body: JSON.stringify(appointmentData),
     });
 
-    const data = await safeJsonParse(response);
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to book appointment');
+    console.log('Response status:', response.status);
+    console.log('Response ok:', response.ok);
+    console.log('Response headers:', response.headers.get('content-type'));
+    
+    // Get response text first to handle both JSON and non-JSON responses
+    const responseText = await response.text();
+    console.log('Response text:', responseText);
+    
+    // Check if response is null or empty - this indicates already booked
+    if (!responseText || responseText === 'null' || responseText.trim() === '') {
+      console.log('Response is null or empty - slot is already booked');
+      throw new Error('Already booked appointment. Please choose a different time slot.');
+    }
+    
+    // Check if response is HTML (like Spring Whitelabel Error Page)
+    const contentType = response.headers.get('content-type');
+    const isHtml = contentType && contentType.includes('text/html');
+    
+    if (isHtml) {
+      console.log('Response is HTML, extracting error message...');
+      // Try to extract error message from HTML
+      // Look for common error patterns in HTML
+      const errorPatterns = [
+        /<h1[^>]*>([^<]+)<\/h1>/i,
+        /<p[^>]*>([^<]+)<\/p>/i,
+        /exception/i,
+        /error/i,
+      ];
+      
+      // Check if it contains runtime exception message
+      if (responseText.toLowerCase().includes('runtimeexception') || 
+          responseText.toLowerCase().includes('already booked')) {
+        throw new Error('Already booked appointment. Please choose a different time slot.');
+      }
+      
+      // If we can't parse the HTML, throw a generic error with status
+      throw new Error(`Server error: ${response.status}`);
+    }
+    
+    // Try to parse as JSON if possible
+    let data;
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch (e) {
+      // If not valid JSON, treat the text as the error message
+      console.log('Response is not valid JSON, treating as error message');
+      data = { message: responseText || 'Unknown error occurred' };
     }
 
+    console.log('Parsed data:', data);
+
+    // Check if data is null or empty after parsing
+    if (!data || data === null || data === 'null') {
+      console.log('Data is null - slot is already booked');
+      throw new Error('Already booked appointment. Please choose a different time slot.');
+    }
+
+    if (!response.ok) {
+      // Check for specific error messages and throw appropriate errors
+      const errorMessage = data.message || data.error || `Server error: ${response.status}`;
+      
+      console.log('Error message from server:', errorMessage);
+      
+      // Check for slot already booked - various possible error messages from backend
+      if (errorMessage.toLowerCase().includes('already booked') || 
+          errorMessage.toLowerCase().includes('slot') ||
+          errorMessage.toLowerCase().includes('not available') ||
+          errorMessage.toLowerCase().includes('already book') ||
+          errorMessage.toLowerCase().includes('occupied') ||
+          errorMessage.toLowerCase().includes('runtime') ||
+          errorMessage.toLowerCase().includes('exception')) {
+        throw new Error('Already booked appointment. Please choose a different time slot.');
+      }
+      
+      // Check for invalid date/time
+      if (errorMessage.toLowerCase().includes('past') || 
+          errorMessage.toLowerCase().includes('invalid date')) {
+        throw new Error('Cannot book appointments for past dates.');
+      }
+      
+      // Check for doctor unavailable
+      if (errorMessage.toLowerCase().includes('doctor') && 
+          errorMessage.toLowerCase().includes('unavailable')) {
+        throw new Error('Doctor is not available. Please choose a different doctor.');
+      }
+      
+      // For any other error, show the actual error message from backend
+      throw new Error(errorMessage);
+    }
+
+    // Try to parse successful response
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      // If response is OK but empty, return success
+      return { success: true };
+    }
+    
     return data;
   } catch (error) {
     console.error('Appointment booking error:', error);
-    throw new Error(error.message || 'Error booking appointment');
+    console.error('Error message:', error.message);
+    // Re-throw the error with the message we set, or a default message
+    throw new Error(error.message || 'Failed to book appointment');
   }
 };
 

@@ -421,7 +421,77 @@ const fetchDoctors = async () => {
     setFilterYear('');
   };
 
+  // Helper function to clean up old booking keys from localStorage
+  const cleanupOldBookingKeys = () => {
+    try {
+      const maxKeysToKeep = 20; // Keep only last 20 booking keys
+      const bookingKeys = [];
+      
+      // Find all booking and booked keys
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('booking_') || key.startsWith('booked_'))) {
+          const value = localStorage.getItem(key);
+          try {
+            const parsed = JSON.parse(value);
+            const bookedAt = parsed.bookedAt || 0;
+            bookingKeys.push({ key, bookedAt });
+          } catch (e) {
+            // If not JSON, try to parse as timestamp
+            const timestamp = parseInt(value);
+            if (!isNaN(timestamp)) {
+              bookingKeys.push({ key, bookedAt: timestamp });
+            }
+          }
+        }
+      }
+      
+      // Sort by timestamp (newest first) and keep only the most recent
+      bookingKeys.sort((a, b) => b.bookedAt - a.bookedAt);
+      
+      // Remove old keys beyond the limit
+      if (bookingKeys.length > maxKeysToKeep) {
+        const keysToRemove = bookingKeys.slice(maxKeysToKeep);
+        keysToRemove.forEach(({ key }) => {
+          localStorage.removeItem(key);
+          console.log(`Cleaned up old booking key: ${key}`);
+        });
+      }
+    } catch (error) {
+      console.error('Error cleaning up old booking keys:', error);
+    }
+  };
+
   const handleSaveAppointment = async () => {
+    // Prevent multiple clicks - check if already booking
+    if (loading.bookingAppointment) {
+      console.log('Appointment booking already in progress, ignoring duplicate click');
+      return;
+    }
+    
+    // Validate form data before proceeding
+    if (!appointmentFormData.doctorId || !appointmentFormData.appointmentDate || !appointmentFormData.timeSlot) {
+      setErrors((prev) => ({ ...prev, bookingAppointment: 'Please fill in all fields' }));
+      return;
+    }
+    
+    // Create a unique key for this booking attempt to prevent race conditions
+    const bookingAttemptKey = `booking_${appointmentFormData.appointmentDate}_${appointmentFormData.timeSlot}`;
+    const lastAttemptTime = localStorage.getItem(bookingAttemptKey);
+    
+    // If there's a recent booking attempt (within 10 seconds), prevent duplicate
+    if (lastAttemptTime) {
+      const timeSinceLastAttempt = Date.now() - parseInt(lastAttemptTime);
+      if (timeSinceLastAttempt < 10000) {
+        console.log('Duplicate booking attempt detected, ignoring');
+        setErrors((prev) => ({ ...prev, bookingAppointment: 'Please wait a moment before trying again' }));
+        return;
+      }
+    }
+    
+    // Mark this booking attempt
+    localStorage.setItem(bookingAttemptKey, Date.now().toString());
+    
     setLoading((prev) => ({ ...prev, bookingAppointment: true }));
     setErrors((prev) => ({ ...prev, bookingAppointment: null }));
     try {
@@ -453,13 +523,20 @@ const fetchDoctors = async () => {
       
       await bookAppointment(appointmentData);
       
+      // Clear the booking attempt key on success
+      localStorage.removeItem(bookingAttemptKey);
+      
+      // Clean up old booking keys (keep only recent ones)
+      cleanupOldBookingKeys();
+      
       // Store in localStorage for persistence
       const bookedAppointmentKey = `booked_${appointmentFormData.appointmentDate}_${appointmentFormData.timeSlot}`;
       localStorage.setItem(bookedAppointmentKey, JSON.stringify({
         doctorName: doctorName,
         doctorId: doctorId,
         appointmentDate: appointmentFormData.appointmentDate,
-        timeSlot: appointmentFormData.timeSlot
+        timeSlot: appointmentFormData.timeSlot,
+        bookedAt: Date.now()
       }));
       
       // Also update local doctorNamesCache for immediate display
@@ -476,7 +553,34 @@ const fetchDoctors = async () => {
       setSuccessMessage('Appointment booked successfully!');
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
-      setErrors((prev) => ({ ...prev, bookingAppointment: error.message }));
+      // Clear the booking attempt key on error too
+      localStorage.removeItem(bookingAttemptKey);
+      
+      console.log('=== BOOKING ERROR DEBUG ===');
+      console.log('Error caught:', error);
+      console.log('Error message:', error.message);
+      console.log('Error toString:', error.toString());
+      
+      // Provide more user-friendly error message
+      let errorMessage = error.message || 'Failed to book appointment';
+      
+      console.log('Original error message:', errorMessage);
+      
+      // Check for various error patterns from backend runtime exceptions
+      if (errorMessage.toLowerCase().includes('already booked') || 
+          errorMessage.toLowerCase().includes('slot') ||
+          errorMessage.toLowerCase().includes('not available') ||
+          errorMessage.toLowerCase().includes('already book') ||
+          errorMessage.toLowerCase().includes('occupied') ||
+          errorMessage.toLowerCase().includes('runtime') ||
+          errorMessage.toLowerCase().includes('exception') ||
+          errorMessage.toLowerCase().includes('duplicate')) {
+        errorMessage = 'Already booked appointment. Please choose a different time slot.';
+      }
+      
+      console.log('Final error message to display:', errorMessage);
+      
+      setErrors((prev) => ({ ...prev, bookingAppointment: errorMessage }));
     } finally {
       setLoading((prev) => ({ ...prev, bookingAppointment: false }));
     }
@@ -611,8 +715,16 @@ const fetchDoctors = async () => {
               <div className="appointment-booking-form">
                 <h3>Book New Appointment</h3>
                 {errors.bookingAppointment && (
-                  <div className="error-message">
-                    <p>Error: {errors.bookingAppointment}</p>
+                  <div className="error-popup">
+                    <span className="error-icon">⚠</span>
+                    <span className="error-text">{errors.bookingAppointment}</span>
+                    <button 
+                      type="button" 
+                      className="dismiss-btn" 
+                      onClick={() => setErrors(prev => ({ ...prev, bookingAppointment: null }))}
+                    >
+                      ×
+                    </button>
                   </div>
                 )}
                 <form onSubmit={(e) => { e.preventDefault(); handleSaveAppointment(); }}>

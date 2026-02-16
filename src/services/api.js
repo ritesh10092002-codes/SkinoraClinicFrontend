@@ -838,7 +838,82 @@ export const bookAppointment = async (appointmentData) => {
       // If response is OK but empty, return success
       return { success: true };
     }
+
+    console.log('=== AUTO-APPROVAL LOGIC ===');
+    console.log('Booking data received:', data);
+    console.log('Checking for appointment ID...');
+    console.log('data.id:', data?.id);
+    console.log('data.appointmentId:', data?.appointmentId);
     
+    // Get the appointment ID - check both possible field names
+    const appointmentId = data?.id || data?.appointmentId;
+    console.log('Final appointment ID:', appointmentId);
+
+    // If booking was successful, automatically confirm the appointment
+    // This ensures appointments go directly from PENDING to CONFIRMED
+    if (appointmentId) {
+      try {
+        console.log('Auto-confirming appointment with ID:', appointmentId);
+        const confirmResponse = await confirmAppointment(appointmentId);
+        console.log('Auto-confirm response:', confirmResponse);
+        console.log('Appointment auto-confirmed successfully!');
+        
+        // Set the status to CONFIRMED in the returned data
+        data.status = 'CONFIRMED';
+        data.approvalStatus = 'CONFIRMED';
+        
+        // Store in localStorage that this appointment is confirmed
+        const bookedAppointmentKey = `booked_${appointmentData.appointmentDate}_${appointmentData.timeSlot}`;
+        localStorage.setItem(bookedAppointmentKey, JSON.stringify({
+          doctorName: appointmentData.doctorName,
+          doctorId: appointmentData.doctorId,
+          appointmentDate: appointmentData.appointmentDate,
+          timeSlot: appointmentData.timeSlot,
+          status: 'CONFIRMED',
+          bookedAt: Date.now()
+        }));
+        
+      } catch (confirmError) {
+        console.error('Failed to auto-confirm appointment:', confirmError);
+        console.error('Error message:', confirmError.message);
+        // Don't throw - the booking was successful, keep status as PENDING
+        data.status = 'PENDING';
+        data.approvalStatus = 'PENDING';
+        data.autoConfirmFailed = true;
+      }
+    } else {
+      console.warn('Could not get appointment ID for auto-confirm - ID might not be returned by backend');
+      // Try to fetch the appointment to get its ID
+      console.log('Attempting to fetch latest appointment...');
+      try {
+        const appointments = await getPatientAppointments();
+        if (appointments && appointments.length > 0) {
+          // Find the most recent appointment with matching date and time
+          const matchingAppointment = appointments.find(
+            apt => apt.appointmentDate === appointmentData.appointmentDate && 
+                   apt.timeSlot === appointmentData.timeSlot
+          );
+          if (matchingAppointment) {
+            const aptId = matchingAppointment.id || matchingAppointment.appointmentId;
+            console.log('Found matching appointment with ID:', aptId);
+            try {
+              await confirmAppointment(aptId);
+              console.log('Appointment confirmed via fallback method!');
+              data.status = 'CONFIRMED';
+              data.approvalStatus = 'CONFIRMED';
+            } catch (fallbackError) {
+              console.error('Fallback confirm also failed:', fallbackError);
+              data.status = 'PENDING';
+            }
+          }
+        }
+      } catch (fetchError) {
+        console.error('Failed to fetch appointments for fallback:', fetchError);
+        data.status = 'PENDING';
+      }
+    }
+
+    console.log('Final appointment data to return:', data);
     return data;
   } catch (error) {
     console.error('Appointment booking error:', error);
@@ -1155,6 +1230,28 @@ export const rejectAppointment = async (appointmentId) => {
   } catch (error) {
     console.error('Reject appointment error:', error);
     throw new Error(error.message || 'Error rejecting appointment');
+  }
+};
+
+/**
+ * Confirm an appointment (auto-confirm when patient books)
+ */
+export const confirmAppointment = async (appointmentId) => {
+  try {
+    const response = await authenticatedFetch(`http://localhost:8085/api/appointment/${appointmentId}/confirm`, {
+      method: 'PUT',
+    });
+
+    const data = await safeJsonParse(response);
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to confirm appointment');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Confirm appointment error:', error);
+    throw new Error(error.message || 'Error confirming appointment');
   }
 };
 

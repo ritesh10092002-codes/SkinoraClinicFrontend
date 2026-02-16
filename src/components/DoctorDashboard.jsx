@@ -9,7 +9,7 @@ import {
   createDoctorProfile,
   updateDoctorProfile,
   getPatientById,
-  approveAppointment,
+  confirmAppointment,
   rejectAppointment,
   completeAppointment
 } from '../services/api';
@@ -450,25 +450,31 @@ const handleSaveProfile = async () => {
           <section className="content-section">
             <h2>Welcome, Dr. {profileData?.name || userEmail || 'Doctor'}!</h2>
             <div className="overview-cards-modern">
-              <div className="overview-card-modern">
-                <div className="overview-card-icon">📅</div>
-                <div className="overview-card-content">
-                  <h3>Total Appointments</h3>
-                  <p className="overview-count">{appointments.length}</p>
+              <div className="overview-card-modern calendar-card">
+                <div className="calendar-icon-wrapper">
+                  <div className="calendar-header">
+                    <span className="calendar-month">{new Date().toLocaleDateString('en-US', { month: 'short' })}</span>
+                  </div>
+                  <div className="calendar-day">
+                    <span>{new Date().getDate()}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="overview-card-modern">
-                <div className="overview-card-icon">⏳</div>
                 <div className="overview-card-content">
-                  <h3>Pending</h3>
-                  <p className="overview-count pending">{appointments.filter(a => a.status === 'PENDING' || a.status === 'Pending').length}</p>
-                </div>
-              </div>
-              <div className="overview-card-modern">
-                <div className="overview-card-icon">✅</div>
-                <div className="overview-card-content">
-                  <h3>Approved</h3>
-                  <p className="overview-count approved">{appointments.filter(a => a.status === 'APPROVED' || a.status === 'Approved').length}</p>
+                  <h3>Booked Appointments</h3>
+                  <p className="overview-count booked">{appointments.filter(apt => {
+                    const aptDate = new Date(apt.appointmentDate);
+                    const now = new Date();
+                    
+                    // Check if timeSlot exists and parse it
+                    if (apt.timeSlot) {
+                      const [startTime] = apt.timeSlot.split('-');
+                      const [hours, minutes] = startTime.trim().split(':').map(Number);
+                      aptDate.setHours(hours, minutes, 0, 0);
+                    }
+                    
+                    // Check if appointment is in the future (upcoming)
+                    return aptDate > now;
+                  }).length}</p>
                 </div>
               </div>
               <div className="overview-card-modern">
@@ -610,9 +616,9 @@ const handleSaveProfile = async () => {
                           // Get patient name
                           const patientName = appointment.patientName || patientNamesCache[appointment.patientId] || `Patient #${appointment.patientId}`;
                           
-                          // Get status
-                          const status = appointment.status || 'Pending';
-                          const statusClass = status.toLowerCase();
+                          // Get status - show all as "Booked"
+                          const status = 'Booked';
+                          const statusClass = 'booked';
                           
                           return (
                             <div key={appointment.id || appointment.appointmentId} className={`doctor-appointment-card-modern ${isToday ? 'today-appointment' : ''} ${isPast ? 'past-appointment' : ''}`}>
@@ -644,11 +650,6 @@ const handleSaveProfile = async () => {
                                     <span className="detail-label">Time:</span>
                                     <span className="detail-value time-slot">{appointment.timeSlot || 'N/A'}</span>
                                   </div>
-                                  <div className="detail-row">
-                                    <span className="detail-icon">👤</span>
-                                    <span className="detail-label">Patient ID:</span>
-                                    <span className="detail-value">{appointment.patientId || 'N/A'}</span>
-                                  </div>
                                   {appointment.notes && (
                                     <div className="detail-row notes-row">
                                       <span className="detail-icon">📝</span>
@@ -658,41 +659,7 @@ const handleSaveProfile = async () => {
                                   )}
                                 </div>
                                 <div className="appointment-card-actions">
-                                  {status === 'Pending' && (
-                                    <>
-                                      <button 
-                                        className="action-btn approve-btn"
-                                        onClick={async () => {
-                                          try {
-                                            await approveAppointment(appointment.id || appointment.appointmentId);
-                                            setSuccessMessage('Appointment approved successfully!');
-                                            fetchAppointments();
-                                            setTimeout(() => setSuccessMessage(''), 3000);
-                                          } catch (error) {
-                                            setErrors(prev => ({ ...prev, saving: error.message }));
-                                          }
-                                        }}
-                                      >
-                                        ✓ Approve
-                                      </button>
-                                      <button 
-                                        className="action-btn reject-btn"
-                                        onClick={async () => {
-                                          try {
-                                            await rejectAppointment(appointment.id || appointment.appointmentId);
-                                            setSuccessMessage('Appointment rejected!');
-                                            fetchAppointments();
-                                            setTimeout(() => setSuccessMessage(''), 3000);
-                                          } catch (error) {
-                                            setErrors(prev => ({ ...prev, saving: error.message }));
-                                          }
-                                        }}
-                                      >
-                                        ✕ Reject
-                                      </button>
-                                    </>
-                                  )}
-                                  {status === 'Approved' && (
+                                  {(status === 'Booked' || status === 'Confirmed' || status === 'PENDING' || status === 'Pending') && (
                                     <button 
                                       className="action-btn complete-btn"
                                       onClick={async () => {
@@ -1470,6 +1437,12 @@ style.textContent = `
     border: 1px solid #fcd34d;
   }
 
+  .status-badge-doctor.booked {
+    background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+    color: #4338ca;
+    border: 1px solid #a5b4fc;
+  }
+
   .status-badge-doctor.approved {
     background: linear-gradient(135deg, #d1fae5 0%, #6ee7b7 100%);
     color: #065f46;
@@ -1918,58 +1891,184 @@ style.textContent = `
   
   .overview-cards-modern {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1.5rem;
     margin-top: 2rem;
   }
 
   .overview-card-modern {
     background: white;
-    border-radius: 16px;
-    padding: 1.5rem;
+    border-radius: 24px;
+    padding: 2rem;
     display: flex;
     align-items: center;
-    gap: 1.25rem;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    gap: 1.5rem;
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.08);
     border: 1px solid rgba(102, 126, 234, 0.1);
-    transition: all 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .overview-card-modern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 8px;
+    height: 100%;
+    background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    border-radius: 24px 0 0 24px;
   }
 
   .overview-card-modern:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
+    transform: translateY(-10px) scale(1.02);
+    box-shadow: 0 25px 60px rgba(102, 126, 234, 0.2);
   }
 
   .overview-card-icon {
-    font-size: 2.5rem;
-    width: 70px;
-    height: 70px;
+    font-size: 3.5rem;
+    width: 90px;
+    height: 90px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 16px;
+    border-radius: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.35);
+    transition: all 0.4s ease;
+  }
+
+  .overview-card-modern:hover .overview-card-icon {
+    transform: scale(1.1) rotate(5deg);
+  }
+
+  .overview-card-content {
+    flex: 1;
   }
 
   .overview-card-content h3 {
     margin: 0;
     color: #64748b;
-    font-size: 0.85rem;
-    font-weight: 600;
+    font-size: 0.95rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1.5px;
   }
 
   .overview-count {
-    margin: 0.5rem 0 0 0;
-    font-size: 2rem;
-    font-weight: 800;
+    margin: 0.75rem 0 0 0;
+    font-size: 3rem;
+    font-weight: 900;
     color: #1e293b;
+    line-height: 1;
+    transition: all 0.3s ease;
+  }
+
+  .overview-card-modern:hover .overview-count {
+    color: #667eea;
   }
 
   .overview-count.pending {
     color: #f59e0b;
+  }
+
+  .overview-count.booked {
+    color: #667eea;
+  }
+
+  .calendar-card {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1.75rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 24px;
+    box-shadow: 0 15px 50px rgba(102, 126, 234, 0.45);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .calendar-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 100%);
+    pointer-events: none;
+  }
+
+  .calendar-card::after {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -40%;
+    width: 150%;
+    height: 150%;
+    background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .calendar-card:hover {
+    transform: translateY(-10px) scale(1.03);
+    box-shadow: 0 25px 60px rgba(102, 126, 234, 0.55);
+  }
+
+  .calendar-icon-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border-radius: 20px;
+    padding: 0.75rem 1.25rem;
+    min-width: 80px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    position: relative;
+    z-index: 1;
+  }
+
+  .calendar-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 12px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+  }
+
+  .calendar-day {
+    color: #1e293b;
+    font-size: 2rem;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .calendar-card .overview-card-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  .calendar-card .overview-card-content h3 {
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+
+  .calendar-card .overview-count {
+    color: white;
+    font-size: 3rem;
+    font-weight: 900;
+    text-shadow: 0 3px 15px rgba(0, 0, 0, 0.25);
   }
 
   .overview-count.approved {
@@ -1983,23 +2082,41 @@ style.textContent = `
   @media (max-width: 768px) {
     .overview-cards-modern {
       grid-template-columns: 1fr;
-      gap: 1rem;
+      gap: 1.25rem;
     }
 
     .overview-card-modern {
-      padding: 1.25rem;
+      padding: 1.5rem;
     }
 
     .overview-card-icon {
-      width: 60px;
-      height: 60px;
-      font-size: 2rem;
+      width: 70px;
+      height: 70px;
+      font-size: 2.5rem;
     }
 
     .overview-count {
-      font-size: 1.75rem;
+      font-size: 2.25rem;
+    }
+
+    .calendar-card {
+      padding: 1.5rem;
+    }
+
+    .calendar-icon-wrapper {
+      min-width: 65px;
+      padding: 0.5rem 1rem;
+    }
+
+    .calendar-day {
+      font-size: 1.5rem;
+    }
+
+    .calendar-card .overview-count {
+      font-size: 2.25rem;
     }
   }
+
 `;
 document.head.appendChild(style);
 

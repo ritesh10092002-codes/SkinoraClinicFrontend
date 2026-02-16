@@ -620,27 +620,40 @@ export const getPatientAppointments = async () => {
       contentLength: response.headers.get('content-length'),
     });
 
-    const data = await safeJsonParse(response);
+    // Handle empty response
+    const responseText = await response.text();
+    console.log('Appointments response text:', responseText);
+    
+    // Check if response is empty
+    if (!responseText || responseText.trim() === '' || responseText === 'null') {
+      console.log('Empty response - returning empty array');
+      return [];
+    }
+
+    // Try to parse JSON
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse appointments JSON:', e);
+      console.error('Response text was:', responseText);
+      // If not valid JSON but response was OK, return empty array
+      if (response.ok) {
+        return [];
+      }
+      throw new Error('Invalid response format from server');
+    }
 
     console.log('Appointments raw data:', data);
     console.log('Appointments data type:', typeof data);
     console.log('Is array:', Array.isArray(data));
-
-    // DEBUG: Log each appointment's fields to identify doctor field name
-    if (Array.isArray(data)) {
-      console.log('=== API DEBUG: Checking appointment fields ===');
-      data.forEach((apt, index) => {
-        console.log(`Appointment ${index + 1} keys:`, Object.keys(apt));
-        console.log(`Appointment ${index + 1} full:`, apt);
-      });
-    }
 
     if (!response.ok) {
       console.error('Appointments fetch failed:', {
         status: response.status,
         data: data
       });
-      throw new Error(data.message || `Failed to fetch appointments (${response.status})`);
+      throw new Error(data?.message || `Failed to fetch appointments (${response.status})`);
     }
 
     // Handle different response formats
@@ -660,11 +673,20 @@ export const getPatientAppointments = async () => {
       } else if (data.content && Array.isArray(data.content)) {
         appointmentsArray = data.content;
         console.log(`✓ Found appointments in content field: ${appointmentsArray.length} items`);
+      } else if (data._embedded?.appointmentList) {
+        appointmentsArray = data._embedded.appointmentList;
+        console.log(`✓ Found appointments in _embedded.appointmentList: ${appointmentsArray.length} items`);
+      } else if (data._embedded?.appointments) {
+        appointmentsArray = data._embedded.appointments;
+        console.log(`✓ Found appointments in _embedded.appointments: ${appointmentsArray.length} items`);
       } else {
         // If it's a single appointment object, wrap it in an array
         if (data.id || data.appointmentId || data.appointmentDate) {
           appointmentsArray = [data];
           console.log('✓ Wrapped single appointment in array');
+        } else {
+          console.log('Could not find appointments in response, returning empty array');
+          console.log('Available keys in response:', Object.keys(data));
         }
       }
     }
@@ -1012,7 +1034,29 @@ export const getDoctorAppointments = async () => {
       contentLength: response.headers.get('content-length'),
     });
 
-    const data = await safeJsonParse(response);
+    // Handle empty response
+    const responseText = await response.text();
+    console.log('Doctor appointments response text:', responseText);
+    
+    // Check if response is empty
+    if (!responseText || responseText.trim() === '' || responseText === 'null') {
+      console.log('Empty response - returning empty array');
+      return [];
+    }
+
+    // Try to parse JSON
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse doctor appointments JSON:', e);
+      console.error('Response text was:', responseText);
+      // If not valid JSON but response was OK, return empty array
+      if (response.ok) {
+        return [];
+      }
+      throw new Error('Invalid response format from server');
+    }
 
     console.log('Doctor appointments raw data:', data);
     console.log('Doctor appointments data type:', typeof data);
@@ -1023,7 +1067,7 @@ export const getDoctorAppointments = async () => {
         status: response.status,
         data: data
       });
-      throw new Error(data.message || `Failed to fetch doctor appointments (${response.status})`);
+      throw new Error(data?.message || `Failed to fetch doctor appointments (${response.status})`);
     }
 
     // Handle different response formats
@@ -1043,11 +1087,20 @@ export const getDoctorAppointments = async () => {
       } else if (data.content && Array.isArray(data.content)) {
         appointmentsArray = data.content;
         console.log(`✓ Found appointments in content field: ${appointmentsArray.length} items`);
+      } else if (data._embedded?.appointmentList) {
+        appointmentsArray = data._embedded.appointmentList;
+        console.log(`✓ Found appointments in _embedded.appointmentList: ${appointmentsArray.length} items`);
+      } else if (data._embedded?.appointments) {
+        appointmentsArray = data._embedded.appointments;
+        console.log(`✓ Found appointments in _embedded.appointments: ${appointmentsArray.length} items`);
       } else {
         // If it's a single appointment object, wrap it in an array
         if (data.id || data.appointmentId || data.appointmentDate) {
           appointmentsArray = [data];
           console.log('✓ Wrapped single appointment in array');
+        } else {
+          console.log('Could not find appointments in response, returning empty array');
+          console.log('Available keys in response:', Object.keys(data));
         }
       }
     }

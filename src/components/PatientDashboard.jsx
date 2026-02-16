@@ -78,12 +78,12 @@ const sortAppointmentsByDate = (appointments) => {
   });
 };
 
-// Helper function to filter appointments by month and year
-const filterAppointmentsByMonthYear = (appointments, month, year) => {
+// Helper function to filter appointments by month, year, and doctor name
+const filterAppointmentsByMonthYear = (appointments, month, year, doctorName, appointmentDoctorNames) => {
   if (!Array.isArray(appointments)) return [];
   
   // If no filter selected, return all appointments
-  if (!month && !year) return appointments;
+  if (!month && !year && !doctorName) return appointments;
   
   return appointments.filter(apt => {
     const aptDate = new Date(apt.appointmentDate);
@@ -93,7 +93,40 @@ const filterAppointmentsByMonthYear = (appointments, month, year) => {
     const monthMatch = !month || aptMonth === parseInt(month);
     const yearMatch = !year || aptYear === parseInt(year);
     
-    return monthMatch && yearMatch;
+    // Filter by doctor name
+    let doctorNameMatch = true;
+    if (doctorName) {
+      // Get doctor name from multiple possible sources
+      let docName = '';
+      
+      // Priority 1: Direct field from backend
+      if (apt.doctorName) {
+        docName = apt.doctorName;
+      } else if (apt.doctor && typeof apt.doctor === 'string') {
+        docName = apt.doctor;
+      } 
+      // Priority 2: From cached names by doctorId
+      else if (apt.doctorId && appointmentDoctorNames && appointmentDoctorNames[apt.doctorId]) {
+        docName = appointmentDoctorNames[apt.doctorId];
+      }
+      // Priority 3: Check localStorage
+      else if (apt.appointmentDate && apt.timeSlot) {
+        const bookedKey = `booked_${apt.appointmentDate}_${apt.timeSlot}`;
+        const storedData = localStorage.getItem(bookedKey);
+        if (storedData) {
+          const parsed = JSON.parse(storedData);
+          docName = parsed.doctorName || '';
+        }
+      }
+      
+      // Clean up the name
+      docName = docName.replace(/^Dr\.?\s*/i, '').trim();
+      docName = docName.split(' - ')[0].trim();
+      
+      doctorNameMatch = docName.toLowerCase().includes(doctorName.toLowerCase());
+    }
+    
+    return monthMatch && yearMatch && doctorNameMatch;
   });
 };
 
@@ -134,6 +167,9 @@ export default function PatientDashboard({ user, onLogout, initialSection = 'ove
   const [appointmentDoctorNames, setAppointmentDoctorNames] = useState({});
   const [filterMonth, setFilterMonth] = useState('');
   const [filterYear, setFilterYear] = useState('');
+  const [filterDoctorName, setFilterDoctorName] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   // Verify token exists on mount and extract email
   useEffect(() => {
@@ -222,20 +258,15 @@ const fetchProfileData = async () => {
       const data = await getPatientAppointments();
       console.log('Appointments fetched successfully:', data);
       
-      // Debug: Log each appointment's fields to identify the doctor field name
-      if (data && data.length > 0) {
-        console.log('=== DEBUG: Appointment fields ===');
-        data.forEach((apt, index) => {
-          console.log(`Appointment ${index + 1}:`, apt);
-          console.log(`Keys:`, Object.keys(apt));
-        });
-      }
+      // Ensure data is an array - defensive coding
+      const appointmentsData = Array.isArray(data) ? data : [];
+      console.log('Appointments data after validation:', appointmentsData);
       
-      setAppointments(data);
+      setAppointments(appointmentsData);
       
       // Fetch doctor names for all appointments
-      if (data && data.length > 0) {
-        const doctorIds = [...new Set(data.map(apt => apt.doctorId).filter(id => id))];
+      if (appointmentsData && appointmentsData.length > 0) {
+        const doctorIds = [...new Set(appointmentsData.map(apt => apt.doctorId).filter(id => id))];
         const namesMap = {};
         
         for (const doctorId of doctorIds) {
@@ -413,12 +444,41 @@ const fetchDoctors = async () => {
       setFilterMonth(value);
     } else if (name === 'filterYear') {
       setFilterYear(value);
+    } else if (name === 'filterDoctorName') {
+      setFilterDoctorName(value);
     }
   };
 
   const clearFilters = () => {
     setFilterMonth('');
     setFilterYear('');
+    setFilterDoctorName('');
+    setCurrentPage(1);
+  };
+
+  // Pagination calculations
+  const getPaginatedAppointments = (appointmentsList) => {
+    const filtered = filterAppointmentsByMonthYear(sortAppointmentsByDate(appointmentsList), filterMonth, filterYear, filterDoctorName, appointmentDoctorNames);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return {
+      filtered,
+      paginated: filtered.slice(startIndex, endIndex),
+      totalPages: Math.ceil(filtered.length / itemsPerPage),
+      totalItems: filtered.length
+    };
+  };
+
+  // Handle page change
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Handle items per page change
+  const handleItemsPerPageChange = (e) => {
+    setItemsPerPage(parseInt(e.target.value));
+    setCurrentPage(1);
   };
 
   // Helper function to clean up old booking keys from localStorage
@@ -591,6 +651,9 @@ const fetchDoctors = async () => {
     onLogout();
   };
 
+  // Calculate pagination data for use in header
+  const paginationData = (appointments && appointments.length > 0) ? getPaginatedAppointments(appointments) : { filtered: [], paginated: [], totalPages: 0, totalItems: 0 };
+
   return (
     <div className="dashboard-container">
       <nav className="dashboard-nav">
@@ -634,17 +697,30 @@ const fetchDoctors = async () => {
       </nav>
 
       <main className="dashboard-content">
-{activeSection === 'overview' && (
+        {activeSection === 'overview' && (
           <section className="content-section">
             <h2>Welcome, {profileData?.name || userEmail || 'Patient'}!</h2>
-            <div className="overview-cards">
-              <div className="card">
-                <h3>Upcoming Appointments</h3>
-                <p>{appointments?.length > 0 ? `${appointments.length} scheduled` : 'No appointments scheduled'}</p>
+            <div className="overview-cards-modern">
+              <div className="overview-card-modern">
+                <div className="overview-card-icon">📅</div>
+                <div className="overview-card-content">
+                  <h3>Upcoming Appointments</h3>
+                  <p className="overview-count">{appointments && appointments.length > 0 ? appointments.length : 0}</p>
+                </div>
               </div>
-              <div className="card">
-                <h3>Health Status</h3>
-                <p>All good</p>
+              <div className="overview-card-modern">
+                <div className="overview-card-icon">✅</div>
+                <div className="overview-card-content">
+                  <h3>Confirmed</h3>
+                  <p className="overview-count approved">{appointments?.filter(a => a.status === 'CONFIRMED' || a.status === 'Approved').length || 0}</p>
+                </div>
+              </div>
+              <div className="overview-card-modern">
+                <div className="overview-card-icon">💚</div>
+                <div className="overview-card-content">
+                  <h3>Health Status</h3>
+                  <p className="overview-count healthy">All Good</p>
+                </div>
               </div>
             </div>
           </section>
@@ -659,10 +735,25 @@ const fetchDoctors = async () => {
               </div>
             )}
             
-            {/* Month/Year Filter */}
+            {/* Month/Year/Doctor Filter */}
             <div className="appointment-filter">
-              <h3>Filter by Month/Year</h3>
+              <h3>🔍 Filter Appointments</h3>
               <div className="filter-controls">
+                <div className="filter-group search-group">
+                  <label htmlFor="filterDoctorName">Doctor Name:</label>
+                  <div className="search-input-wrapper">
+                    <span className="search-icon">👨‍⚕️</span>
+                    <input
+                      type="text"
+                      id="filterDoctorName"
+                      name="filterDoctorName"
+                      value={filterDoctorName}
+                      onChange={handleFilterChange}
+                      placeholder="Search by doctor name"
+                      className="search-input"
+                    />
+                  </div>
+                </div>
                 <div className="filter-group">
                   <label htmlFor="filterMonth">Month:</label>
                   <select
@@ -670,6 +761,7 @@ const fetchDoctors = async () => {
                     name="filterMonth"
                     value={filterMonth}
                     onChange={handleFilterChange}
+                    className="filter-select"
                   >
                     <option value="">All Months</option>
                     <option value="1">January</option>
@@ -693,6 +785,7 @@ const fetchDoctors = async () => {
                     name="filterYear"
                     value={filterYear}
                     onChange={handleFilterChange}
+                    className="filter-select"
                   >
                     <option value="">All Years</option>
                     {getYearOptions().map(year => (
@@ -700,17 +793,54 @@ const fetchDoctors = async () => {
                     ))}
                   </select>
                 </div>
-                {(filterMonth || filterYear) && (
+                {(filterMonth || filterYear || filterDoctorName) && (
                   <button 
                     type="button" 
-                    className="secondary-btn"
+                    className="clear-filter-btn"
                     onClick={clearFilters}
                   >
-                    Clear Filter
+                    ✕ Clear
                   </button>
                 )}
               </div>
             </div>
+            
+            {/* Schedule Appointment Button and Pagination Controls */}
+            <div className="appointments-header-row">
+              <button 
+                className="primary-btn schedule-btn"
+                onClick={handleBookAppointment}
+              >
+                + Schedule Appointment
+              </button>
+              
+              {appointments && appointments.length > 0 && (
+                <div className="header-controls">
+                  <div className="showing-info">
+                    <span className="showing-icon">📋</span>
+                    <span className="showing-text">
+                      Showing <strong>{Math.min(paginationData.paginated.length, itemsPerPage)}</strong> of <strong>{paginationData.totalItems}</strong> appointments
+                    </span>
+                  </div>
+                  
+                  <div className="items-per-page-inline">
+                    <label htmlFor="itemsPerPage">Show:</label>
+                    <select
+                      id="itemsPerPage"
+                      value={itemsPerPage}
+                      onChange={handleItemsPerPageChange}
+                      className="items-select"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={15}>15</option>
+                      <option value={20}>20</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+            
             {isBookingAppointment ? (
               <div className="appointment-booking-form">
                 <h3>Book New Appointment</h3>
@@ -846,19 +976,15 @@ const fetchDoctors = async () => {
                   🔄 Retry
                 </button>
               </div>
-            ) : appointments && appointments.length > 0 ? (
+            ) : (appointments && appointments.length > 0) ? (
               <div className="appointments-list">
-                {/* Apply filter to appointments */}
+                {/* Apply filter and pagination to appointments */}
                 {(() => {
-                  const filteredAppointments = filterAppointmentsByMonthYear(sortAppointmentsByDate(appointments), filterMonth, filterYear);
+                  const { filtered, paginated, totalPages, totalItems } = getPaginatedAppointments(appointments);
                   return (
                     <>
-                      <p style={{ marginBottom: '20px', color: '#666' }}>
-                        📅 Showing <strong>{filteredAppointments.length}</strong> of <strong>{appointments.length}</strong> appointment(s)
-                        {(filterMonth || filterYear) && <span> (filtered)</span>}
-                      </p>
-                      {filteredAppointments.length > 0 ? (
-                        filteredAppointments.map((appointment) => {
+                      {paginated && paginated.length > 0 ? (
+                        paginated.map((appointment) => {
                           const dateInfo = formatDate(appointment.appointmentDate);
                           const timeInfo = formatTimeSlot(appointment.timeSlot);
                           const cardKey = appointment.id || appointment.appointmentId;
@@ -947,7 +1073,46 @@ const fetchDoctors = async () => {
                         })
                       ) : (
                         <div className="empty-state">
-                          <p>📭 No appointments found for the selected month/year.</p>
+                          <p>📭 No appointments found for the selected criteria.</p>
+                        </div>
+                      )}
+                      
+                      {/* Pagination Controls */}
+                      {totalPages > 1 && (
+                        <div className="pagination">
+                          <div className="pagination-info">
+                            Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+                          </div>
+                          <div className="pagination-controls">
+                            <button
+                              className="pagination-btn"
+                              onClick={() => handlePageChange(currentPage - 1)}
+                              disabled={currentPage === 1}
+                            >
+                              ← Previous
+                            </button>
+                            
+                            {/* Page Numbers */}
+                            <div className="page-numbers">
+                              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                <button
+                                  key={page}
+                                  className={`page-number ${currentPage === page ? 'active' : ''}`}
+                                  onClick={() => handlePageChange(page)}
+                                >
+                                  {page}
+                                </button>
+                              ))}
+                            </div>
+                            
+                            <button
+                              className="pagination-btn"
+                              onClick={() => handlePageChange(currentPage + 1)}
+                              disabled={currentPage === totalPages}
+                            >
+                              Next →
+                            </button>
+                          </div>
                         </div>
                       )}
                     </>
@@ -958,15 +1123,6 @@ const fetchDoctors = async () => {
               <div className="empty-state">
                 <p>📭 No appointments scheduled yet. Schedule your first appointment!</p>
               </div>
-            )}
-            {!isBookingAppointment && (
-              <button 
-                className="primary-btn"
-                onClick={handleBookAppointment}
-                style={{ marginTop: '20px' }}
-              >
-                + Schedule Appointment
-              </button>
             )}
           </section>
         )}
@@ -988,7 +1144,7 @@ const fetchDoctors = async () => {
                 <p>Error: {errors.profile}</p>
               </div>
             ) : isEditingProfile || isCreatingProfile ? (
-              <div className="profile-edit-form">
+              <div className="profile-edit-form-modern">
                 {errors.saving && (
                   <div className="error-message">
                     <p>Error: {errors.saving}</p>
@@ -1085,48 +1241,68 @@ const fetchDoctors = async () => {
                 </form>
               </div>
             ) : profileExists && profileData ? (
-              <div className="profile-view">
-                <div className="profile-info">
-                  <div className="profile-field">
-                    <span className="label">Full Name:</span>
-                    <span className="value">{profileData.name || 'N/A'}</span>
+              <div className="profile-view-modern">
+                <div className="profile-card">
+                  <div className="profile-card-header">
+                    <div className="profile-avatar-large">
+                      <span className="avatar-icon">👤</span>
+                    </div>
+                    <div className="profile-card-title">
+                      <h3>{profileData.name || 'Your Name'}</h3>
+                      <p className="profile-specialization">Patient</p>
+                    </div>
                   </div>
-                  <div className="profile-field">
-                    <span className="label">Email:</span>
-                    <span className="value">{profileData.email || 'N/A'}</span>
-                  </div>
-                  <div className="profile-field">
-                    <span className="label">Age:</span>
-                    <span className="value">{profileData.age || 'Not provided'}</span>
-                  </div>
-                  <div className="profile-field">
-                    <span className="label">Gender:</span>
-                    <span className="value">{profileData.gender || 'Not provided'}</span>
-                  </div>
-                  <div className="profile-field">
-                    <span className="label">Phone Number:</span>
-                    <span className="value">{profileData.phoneNumber || 'Not provided'}</span>
+                  <div className="profile-card-body">
+                    <div className="profile-field-modern">
+                      <span className="field-icon">📧</span>
+                      <div className="field-content">
+                        <span className="field-label">Email</span>
+                        <span className="field-value">{profileData.email || 'N/A'}</span>
+                      </div>
+                    </div>
+                    <div className="profile-field-modern">
+                      <span className="field-icon">🎂</span>
+                      <div className="field-content">
+                        <span className="field-label">Age</span>
+                        <span className="field-value">{profileData.age || 'Not provided'}</span>
+                      </div>
+                    </div>
+                    <div className="profile-field-modern">
+                      <span className="field-icon">🚻</span>
+                      <div className="field-content">
+                        <span className="field-label">Gender</span>
+                        <span className="field-value">{profileData.gender || 'Not provided'}</span>
+                      </div>
+                    </div>
+                    <div className="profile-field-modern">
+                      <span className="field-icon">📱</span>
+                      <div className="field-content">
+                        <span className="field-label">Phone Number</span>
+                        <span className="field-value">{profileData.phoneNumber || 'Not provided'}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <button 
-                  className="primary-btn"
+                  className="primary-btn edit-profile-btn"
                   onClick={handleEditProfile}
                 >
-                  Edit Profile
+                  ✏️ Edit Profile
                 </button>
               </div>
             ) : (
-              <div className="profile-not-created">
+              <div className="profile-not-created-modern">
                 <div className="empty-state">
+                  <div className="empty-state-icon">👤</div>
                   <h3>Profile Not Created Yet</h3>
                   <p>Your profile information is not created. Let's get started by creating your profile now.</p>
                   <p><strong>Email:</strong> {userEmail}</p>
                 </div>
                 <button 
-                  className="primary-btn"
+                  className="primary-btn create-profile-btn"
                   onClick={handleCreateProfile}
                 >
-                  Create Profile
+                  ➕ Create Profile
                 </button>
               </div>
             )}
@@ -1136,3 +1312,730 @@ const fetchDoctors = async () => {
     </div>
   );
 }
+
+// Add filter styles for Patient Dashboard
+const patientFilterStyle = document.createElement('style');
+patientFilterStyle.textContent = `
+  /* Patient Dashboard Filter Styles */
+  .appointment-filter {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(56, 239, 125, 0.25);
+  }
+
+  .appointment-filter h3 {
+    color: white;
+    margin: 0 0 20px 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .filter-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-width: 180px;
+  }
+
+  .filter-group label {
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .search-group {
+    flex: 1.5;
+    min-width: 250px;
+  }
+
+  .search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 14px;
+    font-size: 1.1rem;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .search-input,
+  .filter-select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    font-size: 0.95rem;
+    color: #1a1a2e;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    font-weight: 500;
+  }
+
+  .search-input {
+    padding-left: 44px;
+  }
+
+  .search-input:focus,
+  .filter-select:focus {
+    border-color: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.1);
+    background: white;
+    transform: translateY(-1px);
+  }
+
+  .search-input::placeholder {
+    color: #888;
+    font-weight: 400;
+  }
+
+  .filter-select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2311998e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 42px;
+  }
+
+  .filter-select option {
+    background: white;
+    color: #1a1a2e;
+    padding: 12px;
+    font-weight: 500;
+  }
+
+  .clear-filter-btn {
+    padding: 12px 24px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .clear-filter-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .clear-filter-btn:active {
+    transform: translateY(0);
+  }
+
+  @media (max-width: 768px) {
+    .filter-controls {
+      flex-direction: column;
+    }
+    
+    .filter-group {
+      width: 100%;
+    }
+    
+    .search-group {
+      min-width: 100%;
+    }
+    
+    .clear-filter-btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+  
+  /* Animation for filter appearance */
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .appointment-filter {
+    animation: slideDown 0.4s ease-out;
+  }
+`;
+document.head.appendChild(patientFilterStyle);
+
+// Add pagination styles for Patient Dashboard
+const patientPaginationStyle = document.createElement('style');
+patientPaginationStyle.textContent = `
+  /* Patient Dashboard Header Row */
+  .appointments-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(56, 239, 125, 0.3);
+  }
+
+  .schedule-btn {
+    background: white !important;
+    color: #11998e !important;
+    font-weight: 700 !important;
+    padding: 12px 28px !important;
+    border-radius: 10px !important;
+    font-size: 1rem !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+    transition: all 0.3s ease !important;
+  }
+
+  .schedule-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .showing-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .showing-icon {
+    font-size: 1.1rem;
+  }
+
+  .showing-text {
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .showing-text strong {
+    font-weight: 700;
+    font-size: 1rem;
+  }
+
+  .items-per-page-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .items-per-page-inline label {
+    color: white;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .items-select {
+    padding: 6px 12px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 6px;
+    background: white;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #11998e;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+  }
+
+  .items-select:hover {
+    border-color: white;
+  }
+
+  .items-select:focus {
+    border-color: white;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+  }
+
+  .items-select option {
+    background: white;
+    color: #333;
+    font-weight: 500;
+  }
+
+  @media (max-width: 768px) {
+    .appointments-header-row {
+      flex-direction: column;
+      align-items: stretch;
+      text-align: center;
+    }
+
+    .schedule-btn {
+      width: 100%;
+    }
+
+    .header-controls {
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .showing-info,
+    .items-per-page-inline {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  /* Pagination Styles */
+  .appointments-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .appointments-count {
+    margin: 0;
+    color: #666;
+    font-size: 0.95rem;
+  }
+  
+  .items-per-page {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .items-per-page label {
+    color: #666;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+  
+  .items-per-page-select {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+    font-size: 0.9rem;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .items-per-page-select:hover {
+    border-color: #11998e;
+  }
+  
+  .items-per-page-select:focus {
+    outline: none;
+    border-color: #11998e;
+    box-shadow: 0 0 0 2px rgba(17, 153, 142, 0.2);
+  }
+  
+  .pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  
+  .pagination-info {
+    color: #666;
+    font-size: 0.9rem;
+  }
+  
+  .pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .pagination-btn {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+    color: #333;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .pagination-btn:hover:not(:disabled) {
+    background: #11998e;
+    border-color: #11998e;
+    color: white;
+  }
+  
+  .pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .page-numbers {
+    display: flex;
+    gap: 4px;
+  }
+  
+  .page-number {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+    color: #333;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .page-number:hover {
+    border-color: #11998e;
+    color: #11998e;
+  }
+  
+  .page-number.active {
+    background: #11998e;
+    border-color: #11998e;
+    color: white;
+    font-weight: 600;
+  }
+  
+  @media (max-width: 600px) {
+    .pagination {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .pagination-controls {
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .page-numbers {
+      order: -1;
+      width: 100%;
+      justify-content: center;
+      margin-bottom: 8px;
+    }
+  }
+
+  /* ===== PATIENT PROFILE - TOP NOTCH CSS ===== */
+  
+  .profile-edit-form-modern {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(17, 153, 142, 0.1);
+  }
+
+  .profile-edit-form-modern form {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .profile-view-modern {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .profile-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    border: 1px solid rgba(17, 153, 142, 0.1);
+  }
+
+  .profile-card-header {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    padding: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    position: relative;
+  }
+
+  .profile-avatar-large {
+    width: 80px;
+    height: 80px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    flex-shrink: 0;
+  }
+
+  .profile-avatar-large .avatar-icon {
+    font-size: 2.5rem;
+  }
+
+  .profile-card-title {
+    flex: 1;
+  }
+
+  .profile-card-title h3 {
+    margin: 0;
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+
+  .profile-specialization {
+    margin: 0.5rem 0 0 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  .profile-card-body {
+    padding: 1.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .profile-field-modern {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+    border-radius: 12px;
+    transition: all 0.3s ease;
+  }
+
+  .profile-field-modern:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 12px rgba(17, 153, 142, 0.1);
+  }
+
+  .profile-field-modern .field-icon {
+    font-size: 1.5rem;
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+  }
+
+  .profile-field-modern .field-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .profile-field-modern .field-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .profile-field-modern .field-value {
+    font-size: 1rem;
+    color: #1e293b;
+    font-weight: 600;
+  }
+
+  .edit-profile-btn,
+  .create-profile-btn {
+    align-self: flex-start;
+    padding: 14px 32px !important;
+    font-size: 1rem !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4) !important;
+  }
+
+  .edit-profile-btn:hover,
+  .create-profile-btn:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 25px rgba(17, 153, 142, 0.5) !important;
+  }
+
+  .profile-not-created-modern {
+    text-align: center;
+    padding: 3rem 2rem;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    border: 2px dashed rgba(17, 153, 142, 0.3);
+  }
+
+  .profile-not-created-modern .empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+  }
+
+  .profile-not-created-modern h3 {
+    color: #1e293b;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .profile-not-created-modern p {
+    color: #64748b;
+    margin-bottom: 0.5rem;
+  }
+
+  @media (max-width: 768px) {
+    .profile-card-header {
+      flex-direction: column;
+      text-align: center;
+      padding: 1.5rem;
+    }
+
+    .profile-card-body {
+      padding: 1rem 1.5rem;
+    }
+
+    .profile-field-modern {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .edit-profile-btn,
+    .create-profile-btn {
+      width: 100%;
+    }
+  }
+
+  /* ===== PATIENT OVERVIEW - TOP NOTCH CSS ===== */
+  
+  .overview-cards-modern {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+
+  .overview-card-modern {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(17, 153, 142, 0.1);
+    transition: all 0.3s ease;
+  }
+
+  .overview-card-modern:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(17, 153, 142, 0.2);
+  }
+
+  .overview-card-icon {
+    font-size: 2.5rem;
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .overview-card-content h3 {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .overview-count {
+    margin: 0.5rem 0 0 0;
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1e293b;
+  }
+
+  .overview-count.approved {
+    color: #10b981;
+  }
+
+  .overview-count.healthy {
+    color: #10b981;
+  }
+
+  @media (max-width: 768px) {
+    .overview-cards-modern {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .overview-card-modern {
+      padding: 1.25rem;
+    }
+
+    .overview-card-icon {
+      width: 60px;
+      height: 60px;
+      font-size: 2rem;
+    }
+
+    .overview-count {
+      font-size: 1.75rem;
+    }
+  }
+`;
+document.head.appendChild(patientPaginationStyle);

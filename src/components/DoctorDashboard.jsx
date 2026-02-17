@@ -616,9 +616,15 @@ const handleSaveProfile = async () => {
                           // Get patient name
                           const patientName = appointment.patientName || patientNamesCache[appointment.patientId] || `Patient #${appointment.patientId}`;
                           
-                          // Get status - show all as "Booked"
-                          const status = 'Booked';
-                          const statusClass = 'booked';
+                          // Get actual status from appointment
+                          const appointmentStatus = appointment.status || 'PENDING';
+                          const status = appointmentStatus === 'CONFIRMED' ? 'Booked' :
+                                        appointmentStatus === 'BOOKED' ? 'Booked' :
+                                        appointmentStatus === 'COMPLETED' ? 'Completed' :
+                                        appointmentStatus === 'CANCELLED' || appointmentStatus === 'REJECTED' ? 'Cancelled' :
+                                        appointmentStatus === 'PENDING' ? 'Booked' :
+                                        appointmentStatus;
+                          const statusClass = appointmentStatus.toLowerCase() === 'pending' ? 'booked' : appointmentStatus.toLowerCase();
                           
                           return (
                             <div key={appointment.id || appointment.appointmentId} className={`doctor-appointment-card-modern ${isToday ? 'today-appointment' : ''} ${isPast ? 'past-appointment' : ''}`}>
@@ -650,31 +656,13 @@ const handleSaveProfile = async () => {
                                     <span className="detail-label">Time:</span>
                                     <span className="detail-value time-slot">{appointment.timeSlot || 'N/A'}</span>
                                   </div>
+
                                   {appointment.notes && (
                                     <div className="detail-row notes-row">
                                       <span className="detail-icon">📝</span>
                                       <span className="detail-label">Notes:</span>
                                       <span className="detail-value">{appointment.notes}</span>
                                     </div>
-                                  )}
-                                </div>
-                                <div className="appointment-card-actions">
-                                  {(status === 'Booked' || status === 'Confirmed' || status === 'PENDING' || status === 'Pending') && (
-                                    <button 
-                                      className="action-btn complete-btn"
-                                      onClick={async () => {
-                                        try {
-                                          await completeAppointment(appointment.id || appointment.appointmentId);
-                                          setSuccessMessage('Appointment completed!');
-                                          fetchAppointments();
-                                          setTimeout(() => setSuccessMessage(''), 3000);
-                                        } catch (error) {
-                                          setErrors(prev => ({ ...prev, saving: error.message }));
-                                        }
-                                      }}
-                                    >
-                                      ✓ Mark Complete
-                                    </button>
                                   )}
                                 </div>
                               </div>

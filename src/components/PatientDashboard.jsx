@@ -705,7 +705,20 @@ const fetchDoctors = async () => {
                 <div className="overview-card-icon">📅</div>
                 <div className="overview-card-content">
                   <h3>Upcoming Appointments</h3>
-                  <p className="overview-count">{appointments && appointments.length > 0 ? appointments.length : 0}</p>
+                  <p className="overview-count">{appointments && appointments.length > 0 ? appointments.filter(apt => {
+                    const aptDate = new Date(apt.appointmentDate);
+                    const now = new Date();
+                    
+                    // Check if timeSlot exists and parse it
+                    if (apt.timeSlot) {
+                      const [startTime] = apt.timeSlot.split('-');
+                      const [hours, minutes] = startTime.trim().split(':').map(Number);
+                      aptDate.setHours(hours, minutes, 0, 0);
+                    }
+                    
+                    // Check if appointment is in the future (upcoming)
+                    return aptDate > now;
+                  }).length : 0}</p>
                 </div>
               </div>
               <div className="overview-card-modern calendar-card">
@@ -945,10 +958,14 @@ const fetchDoctors = async () => {
                       <option value="09:30-10:00">09:30 - 10:00</option>
                       <option value="10:00-10:30">10:00 - 10:30</option>
                       <option value="10:30-11:00">10:30 - 11:00</option>
-                      <option value="14:00-14:30">14:00 - 14:30</option>
-                      <option value="14:30-15:00">14:30 - 15:00</option>
-                      <option value="15:00-15:30">15:00 - 15:30</option>
-                      <option value="15:30-16:00">15:30 - 16:00</option>
+                      <option value="11:00-11:30">11:00 - 11:30</option>
+                      <option value="18:00-18:30">18:00 - 18:30</option>
+                      <option value="18:30-19:00">18:30 - 19:00</option>
+                      <option value="19:00-19:30">19:00 - 19:30</option>
+                      <option value="19:30-20:00">19:30 - 20:00</option>
+                      <option value="20:00-20:30">20:00 - 20:30</option>
+                      <option value="20:30-21:00">20:30 - 21:00</option>
+                      <option value="21:00-21:30">21:00 - 21:30</option>
                     </select>
                   </div>
 
@@ -1082,8 +1099,8 @@ const fetchDoctors = async () => {
                                   <div className="detail-item">
                                     <span className="detail-icon">📋</span>
                                     <span className="detail-label">Status:</span>
-                                    <span className={`status-badge ${(appointment.status || 'Scheduled').toLowerCase()}`}>
-                                      {appointment.status === 'CONFIRMED' ? 'Confirmed' : (appointment.status || 'Scheduled')}
+                                    <span className={`status-badge ${(appointment.status || 'Booked').toLowerCase() === 'confirmed' ? 'booked' : (appointment.status || 'Booked').toLowerCase()}`}>
+                                      {appointment.status === 'CONFIRMED' ? 'Booked' : (appointment.status === 'BOOKED' ? 'Booked' : 'Booked')}
                                     </span>
                                   </div>
                                 </div>

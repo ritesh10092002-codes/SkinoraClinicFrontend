@@ -658,6 +658,7 @@ const fetchDoctors = async () => {
     <div className="dashboard-container">
       <nav className="dashboard-nav">
         <div className="nav-header">
+          <img src="/src/assets/Skinora logo.png" alt="Skinora" className="nav-logo-image" />
           <h1>Skinora Dashboard</h1>
         </div>
         <ul className="nav-menu">

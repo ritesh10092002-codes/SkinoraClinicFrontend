@@ -84,7 +84,7 @@ if (success) {
           {/* Brand Header */}
           <div className="auth-brand">
             <div className="brand-logo">
-              <span className="logo-icon">✦</span>
+              <img src="/src/assets/Skinora logo.png" alt="Skinora" className="logo-image" />
               <span className="logo-text">SKINORA</span>
             </div>
           </div>
@@ -104,7 +104,7 @@ if (success) {
         {/* Brand Header */}
         <div className="auth-brand">
           <div className="brand-logo">
-            <span className="logo-icon">✦</span>
+            <img src="/src/assets/Skinora logo.png" alt="Skinora" className="logo-image" />
             <span className="logo-text">SKINORA</span>
           </div>
         </div>

@@ -407,6 +407,7 @@ const handleSaveProfile = async () => {
     <div className="dashboard-container doctor-dashboard">
       <nav className="dashboard-nav">
         <div className="nav-header">
+          <img src="/src/assets/Skinora logo.png" alt="Skinora" className="nav-logo-image" />
           <h1>🩺 Doctor Dashboard</h1>
         </div>
         <ul className="nav-menu">

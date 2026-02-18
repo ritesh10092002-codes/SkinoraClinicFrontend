@@ -135,6 +135,12 @@
   margin-bottom: 0.5rem;
 }
 
+.auth-brand .logo-image {
+  height: 50px;
+  width: auto;
+  object-fit: contain;
+}
+
 .auth-brand .logo-icon {
   font-size: 2rem;
   color: #c4a35a;
@@ -566,6 +572,13 @@
   position: sticky;
   top: 0;
   background: inherit;
+}
+
+.nav-header .nav-logo-image {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+  margin-bottom: 0.5rem;
 }
 
 .nav-header h1 {

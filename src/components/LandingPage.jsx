@@ -18,7 +18,7 @@ const LandingPage = ({ onLoginClick, onSignupClick, onBookingClick }) => {
       <nav className="landing-nav">
         <div className="nav-container">
           <div className="nav-logo">
-            <span className="logo-icon">✦</span>
+            <img src="/src/assets/Skinora logo.png" alt="Skinora" className="logo-image" />
             <span className="logo-text">SKINORA</span>
           </div>
           
@@ -136,7 +136,8 @@ const LandingPage = ({ onLoginClick, onSignupClick, onBookingClick }) => {
           </div>
 
           <div className="services-grid">
-            <div className="service-card">
+            <div className="service-card featured">
+              <div className="featured-badge">Popular</div>
               <div className="service-icon">
                 <span>✨</span>
               </div>
@@ -167,7 +168,8 @@ const LandingPage = ({ onLoginClick, onSignupClick, onBookingClick }) => {
               </ul>
             </div>
 
-            <div className="service-card">
+            <div className="service-card featured">
+              <div className="featured-badge">Trending</div>
               <div className="service-icon">
                 <span>🌟</span>
               </div>
@@ -262,32 +264,22 @@ const LandingPage = ({ onLoginClick, onSignupClick, onBookingClick }) => {
               <div className="doctors-showcase">
                 <div className="doctor-card">
                   <div className="doctor-image">
-                    <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="60" cy="60" r="60" fill="#f5f0e6"/>
-                      <circle cx="60" cy="45" r="22" fill="#c4a35a"/>
-                      <ellipse cx="60" cy="95" rx="35" ry="25" fill="#c4a35a"/>
-                      <path d="M45 38C45 33 50 30 60 30C70 30 75 33 75 38C75 43 70 46 60 46C50 46 45 43 45 38Z" fill="#a88b45"/>
-                    </svg>
+                    <img src="/src/assets/Hemesh.png" alt="Dr. Hemesh Sarode" />
                   </div>
                   <div className="doctor-info">
-                    <h4>Dr. Name</h4>
-                    <p>Dermatologist</p>
+                    <h4>Dr. Hemesh Sarode</h4>
+                    <p>MBBS (KEM Mumbai)<br/>DDV (Govt Yavatmal)<br/>FAM (Mumbai)</p>
                     <span className="doctor-specialty">Skin & Hair Expert</span>
                   </div>
                 </div>
                 <div className="doctor-card">
                   <div className="doctor-image">
-                    <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="60" cy="60" r="60" fill="#f5f0e6"/>
-                      <circle cx="60" cy="45" r="22" fill="#c4a35a"/>
-                      <ellipse cx="60" cy="95" rx="35" ry="25" fill="#c4a35a"/>
-                      <path d="M45 38C45 33 50 30 60 30C70 30 75 33 75 38C75 43 70 46 60 46C50 46 45 43 45 38Z" fill="#a88b45"/>
-                    </svg>
+                    <img src="/src/assets/Jayashree.png" alt="Dr. Jayashree Sarode" />
                   </div>
                   <div className="doctor-info">
-                    <h4>Dr. Name</h4>
-                    <p>Dermatologist</p>
-                    <span className="doctor-specialty">Laser Specialist</span>
+                    <h4>Dr. Jayashree Sarode</h4>
+                    <p>Diploma in Clinical Cosmetology<br/>PGDCC (Pune)<br/>Consultation Cosmetology<br/>and Trichologist</p>
+                    <span className="doctor-specialty">Skin & Hair Expert</span>
                   </div>
                 </div>
               </div>
@@ -462,7 +454,7 @@ As part of the treatment, I had a chemical peel and a medi-facial. The services 
           <div className="footer-main">
             <div className="footer-brand">
               <div className="footer-logo">
-                <span className="logo-icon">✦</span>
+                <img src="/src/assets/Skinora logo.png" alt="Skinora" className="footer-logo-image" />
                 <span className="logo-text">SKINORA</span>
               </div>
               <p>Your trusted partner in beauty and wellness. Experience the difference with our premium dermatology and aesthetic treatments.</p>

@@ -59,6 +59,12 @@
   gap: 0.75rem;
 }
 
+.logo-image {
+  height: 50px;
+  width: auto;
+  object-fit: contain;
+}
+
 .logo-icon {
   font-size: 2rem;
   color: var(--lp-primary);
@@ -478,10 +484,16 @@
 
 .service-card.featured * {
   color: white;
+  font-weight: 600;
+}
+
+.service-card.featured h3 {
+  font-weight: 700;
 }
 
 .service-card.featured .service-list li {
   border-color: rgba(255, 255, 255, 0.2);
+  font-weight: 500;
 }
 
 .featured-badge {
@@ -691,18 +703,19 @@
 /* Doctors Showcase */
 .doctors-showcase {
   display: flex;
-  gap: 1.5rem;
+  gap: 2.5rem;
   justify-content: center;
+  align-items: stretch;
 }
 
 .doctor-card {
   background: white;
   border-radius: var(--lp-radius);
-  padding: 1.5rem;
+  padding: 2rem;
   text-align: center;
   box-shadow: var(--lp-shadow);
   transition: all 0.3s ease;
-  width: 200px;
+  width: 280px;
 }
 
 .doctor-card:hover {
@@ -711,40 +724,43 @@
 }
 
 .doctor-image {
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 1rem;
+  width: 180px;
+  height: 180px;
+  margin: 0 auto 1.5rem;
   border-radius: 50%;
   overflow: hidden;
-  border: 3px solid var(--lp-primary);
+  border: 4px solid var(--lp-primary);
+  background: #f5f0e6;
 }
 
-.doctor-image svg {
+.doctor-image img {
   width: 100%;
   height: 100%;
+  object-fit: cover;
 }
 
 .doctor-info h4 {
   font-family: var(--lp-font-heading);
-  font-size: 1.1rem;
+  font-size: 1.35rem;
   font-weight: 600;
   color: var(--lp-text-dark);
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .doctor-info p {
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   color: var(--lp-text-light);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
 }
 
 .doctor-specialty {
   display: inline-block;
-  padding: 0.3rem 0.75rem;
+  padding: 0.4rem 1rem;
   background: rgba(196, 163, 90, 0.15);
   color: var(--lp-primary-dark);
   border-radius: 50px;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   font-weight: 500;
 }
 
@@ -1093,8 +1109,21 @@
   margin-bottom: 1.25rem;
 }
 
+.footer-logo-image {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+
 .footer-logo .logo-text {
+  font-family: var(--lp-font-heading);
   font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  background: var(--lp-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .footer-brand p {

@@ -227,7 +227,16 @@ export default function Login({ onLoginSuccess, onSwitchToSignup, onNeedsProfile
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h2>Skinora Login</h2>
+        {/* Brand Header */}
+        <div className="auth-brand">
+          <div className="brand-logo">
+            <span className="logo-icon">✦</span>
+            <span className="logo-text">SKINORA</span>
+          </div>
+        </div>
+        
+        <h2>Welcome Back</h2>
+        <p className="subtitle">Login to your account to continue</p>
         
         {/* Success Popup */}
         {successMessage && (

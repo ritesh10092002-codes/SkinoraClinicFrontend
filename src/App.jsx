@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import LandingPage from './components/LandingPage'
 import Login from './components/Login'
 import Signup from './components/Signup'
 import PatientDashboard from './components/PatientDashboard'
@@ -8,6 +9,7 @@ import CreateProfile from './components/CreateProfile'
 import { getJwtToken, isSessionExpired, refreshSession, logoutUser, getUserRole, isDoctor, isPatient } from './services/api'
 
 function App() {
+  const [showLanding, setShowLanding] = useState(true)
   const [isLogin, setIsLogin] = useState(true)
   const [user, setUser] = useState(null)
   const [userRole, setUserRole] = useState(null)
@@ -15,6 +17,24 @@ function App() {
   const [showCreateProfile, setShowCreateProfile] = useState(false)
   const [initialSection, setInitialSection] = useState('overview')
   const [signupSuccess, setSignupSuccess] = useState(false)
+
+  // Handle navigation to login
+  const handleLoginClick = () => {
+    setShowLanding(false);
+    setIsLogin(true);
+  };
+
+  // Handle navigation to signup
+  const handleSignupClick = () => {
+    setShowLanding(false);
+    setIsLogin(false);
+  };
+
+  // Handle booking button click - navigate to appointment booking
+  const handleBookingClick = () => {
+    setShowLanding(false);
+    setIsLogin(true);
+  };
 
   // ===== SESSION MANAGEMENT =====
   // Check if there's an active session on app load
@@ -159,6 +179,17 @@ const handleLogout = () => {
           <p>Loading...</p>
         </div>
       </div>
+    );
+  }
+
+  // Render landing page for unauthenticated users
+  if (showLanding) {
+    return (
+      <LandingPage 
+        onLoginClick={handleLoginClick}
+        onSignupClick={handleSignupClick}
+        onBookingClick={handleBookingClick}
+      />
     );
   }
 

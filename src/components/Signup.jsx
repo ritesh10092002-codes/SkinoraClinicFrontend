@@ -81,6 +81,13 @@ if (success) {
     return (
       <div className="auth-container">
         <div className="auth-card success-card">
+          {/* Brand Header */}
+          <div className="auth-brand">
+            <div className="brand-logo">
+              <span className="logo-icon">✦</span>
+              <span className="logo-text">SKINORA</span>
+            </div>
+          </div>
           <div className="success-icon">✓</div>
           <h2>Signup successful!</h2>
           <p>Your {role.toLowerCase() === 'doctor' ? 'Doctor' : 'Patient'} account has been created.</p>
@@ -94,7 +101,16 @@ if (success) {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h2>Sign Up</h2>
+        {/* Brand Header */}
+        <div className="auth-brand">
+          <div className="brand-logo">
+            <span className="logo-icon">✦</span>
+            <span className="logo-text">SKINORA</span>
+          </div>
+        </div>
+        
+        <h2>Create Account</h2>
+        <p className="subtitle">Join us to book your appointment</p>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="email">Email:</label>

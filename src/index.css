@@ -1,29 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap');
+
 :root {
-  --primary-color: #667eea;
-  --primary-dark: #764ba2;
-  --secondary-color: #f093fb;
-  --success-color: #4caf50;
-  --error-color: #f44336;
-  --warning-color: #ff9800;
+  --primary-color: #c4a35a;
+  --primary-dark: #a88b45;
+  --secondary-color: #2c3e50;
+  --success-color: #16a34a;
+  --error-color: #dc2626;
+  --warning-color: #d97706;
   --text-dark: #1a1a2e;
-  --text-light: #666666;
-  --bg-light: #f8f9fa;
+  --text-light: #6b7280;
+  --bg-light: #f9fafb;
   --bg-white: #ffffff;
-  --border-color: #e0e0e0;
+  --border-color: #e5e7eb;
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.15);
-  --radius-sm: 6px;
+  --radius-sm: 8px;
   --radius-md: 12px;
-  --radius-lg: 16px;
+  --radius-lg: 20px;
   --transition-fast: 0.2s ease;
   --transition-normal: 0.3s ease;
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Poppins', sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: light;
+  color: #1a1a2e;
+  background-color: #ffffff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -42,24 +44,22 @@ html {
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Poppins', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #fdfbf7 0%, #f5f0e6 100%);
   min-height: 100vh;
-  color: var(--text-dark);
+  color: #1a1a2e;
   line-height: 1.6;
-  display: flex;
-  place-items: center;
+  display: block;
   min-width: 320px;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-weight: 600;
   line-height: 1.3;
-  color: var(--text-dark);
+  color: #1a1a2e;
+  font-family: 'Playfair Display', serif;
 }
 
 h1 {
@@ -75,47 +75,46 @@ h3 {
 }
 
 p {
-  color: var(--text-light);
+  color: #6b7280;
 }
 
 a {
   font-weight: 500;
-  color: var(--primary-color);
+  color: #c4a35a;
   text-decoration: none;
-  transition: color var(--transition-fast);
+  transition: color 0.2s ease;
 }
 
 a:hover {
-  color: var(--primary-dark);
+  color: #a88b45;
 }
 
 button {
-  font-family: inherit;
+  font-family: 'Poppins', sans-serif;
   cursor: pointer;
-  transition: all var(--transition-normal);
+  transition: all 0.3s ease;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   font-weight: 500;
   padding: 0.6em 1.2em;
   font-size: 1em;
-  background-color: #1a1a1a;
 }
 
 button:hover {
-  border-color: #646cff;
+  opacity: 0.9;
 }
 
 button:focus {
-  outline: 2px solid var(--primary-color);
+  outline: 2px solid #c4a35a;
   outline-offset: 2px;
 }
 
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 4px auto #c4a35a;
 }
 
 input, textarea, select {
-  font-family: inherit;
+  font-family: 'Poppins', sans-serif;
 }
 
 input:focus, textarea:focus, select:focus {
@@ -138,13 +137,7 @@ input:focus, textarea:focus, select:focus {
 
 @media (prefers-color-scheme: light) {
   :root {
-    color: #213547;
+    color: #1a1a2e;
     background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
   }
 }
